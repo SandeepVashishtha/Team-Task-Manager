@@ -18,6 +18,7 @@ function getInitials(name = '') {
 export default function Sidebar() {
   const { user, role, logout, token } = useAuth();
   const router = useRouter();
+  const navItems = role === 'member' ? NAV.filter(item => item.href !== '/teams') : NAV;
 
   return (
     <aside className="sidebar">
@@ -33,7 +34,7 @@ export default function Sidebar() {
       {/* Nav */}
       <nav className="sidebar-nav">
         <div className="nav-section-label">Navigation</div>
-        {NAV.map(item => (
+        {navItems.map(item => (
           <Link
             key={item.href}
             href={item.href}

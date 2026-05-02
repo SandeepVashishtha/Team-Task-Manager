@@ -306,9 +306,15 @@ export default function ProjectPage() {
   }
 
   const tasksByStatus = STATUSES.reduce((acc, s) => { acc[s] = tasks.filter(t => t.status === s); return acc; }, {});
-  const ownerId = project?.owner?._id;
-  const myMember = project?.members?.find(m => (m.user?._id || m._id) === user?._id);
-  const isProjectAdmin = role === 'admin' || ownerId === user?._id || myMember?.role === 'admin';
+  const ownerId = project?.owner?._id?.toString() || project?.owner?.toString();
+  const myUserId = user?._id?.toString();
+  const myMember = project?.members?.find(m => (m.user?._id?.toString() || m._id?.toString()) === myUserId);
+  const isOwner = !!myUserId && ownerId === myUserId;
+  // Check both context role and user object role to handle stale localStorage
+  const isGlobalAdmin = role === 'admin' || user?.role === 'admin';
+  const isProjectAdmin = isGlobalAdmin || isOwner || myMember?.role === 'admin';
+  // Only the project owner or a global admin can delete (matches backend rule)
+  const canDelete = isOwner || isGlobalAdmin;
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
@@ -383,7 +389,7 @@ export default function ProjectPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
                 {project.members.map(m => {
                   const u = m.user || m;
-                  const isOwner = u?._id && u._id === ownerId;
+                  const isOwner = u?._id && u._id.toString() === ownerId;
                   return (
                     <div key={u?._id || `${u?.email}-${m?.role}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
                       <div>
@@ -435,9 +441,9 @@ export default function ProjectPage() {
           <button className="btn btn-primary" onClick={() => setShowTaskModal(true)}>
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span> Add Task
           </button>
-          {ownerId === user?._id && (
-            <button className="btn btn-danger" onClick={handleDeleteProject}>
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span> Delete
+          {canDelete && (
+            <button id="delete-project-btn" className="btn btn-danger" onClick={handleDeleteProject}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span> Delete Project
             </button>
           )}
         </div>
