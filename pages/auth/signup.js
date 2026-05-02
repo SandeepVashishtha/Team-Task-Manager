@@ -33,10 +33,15 @@ export default function Signup() {
     <div className="auth-bg">
       <div className="auth-card">
         <div className="auth-logo">
-          <div style={{ width: 44, height: 44, fontSize: 22, borderRadius: 12, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(99,102,241,.3)' }}>⚡</div>
+          <div style={{
+            fontSize: 14, fontWeight: 800, textTransform: 'uppercase',
+            letterSpacing: '-0.01em', color: 'var(--text)',
+          }}>
+            TEAM TASK MANAGER
+          </div>
         </div>
         <h1 className="auth-title" style={{ textAlign: 'center' }}>Create account</h1>
-        <p className="auth-subtitle" style={{ textAlign: 'center' }}>Join your team on TaskFlow</p>
+        <p className="auth-subtitle" style={{ textAlign: 'center' }}>Join your team on Team Task Manager</p>
 
         {error && <div className="alert alert-error">{error}</div>}
 
@@ -47,7 +52,7 @@ export default function Signup() {
               id="signup-name"
               type="text"
               className="form-input"
-              placeholder="John Doe"
+              placeholder="Your Name"
               value={name}
               onChange={e => setName(e.target.value)}
               required
@@ -97,7 +102,7 @@ export default function Signup() {
             id="signup-submit"
             type="submit"
             className="btn btn-primary"
-            style={{ width: '100%', padding: '12px', fontSize: 15, marginTop: 4 }}
+            style={{ width: '100%', padding: '12px', fontSize: 14, marginTop: 4 }}
             disabled={loading}
           >
             {loading ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> : 'Create account'}

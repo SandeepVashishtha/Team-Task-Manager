@@ -3,10 +3,12 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 
 const NAV = [
-  { href: '/dashboard', icon: '', label: 'Dashboard' },
-  { href: '/projects',  icon: '', label: 'Projects'  },
-  { href: '/tasks',     icon: '', label: 'Tasks'     },
-  { href: '/teams',     icon: '', label: 'Teams'     },
+  { href: '/dashboard', icon: 'dashboard',      label: 'Dashboard' },
+  { href: '/projects',  icon: 'folder_open',     label: 'Projects' },
+  { href: '/tasks',     icon: 'task_alt',        label: 'Tasks' },
+  { href: '/teams',     icon: 'group',           label: 'Teams' },
+  { href: '/profile',   icon: 'person',          label: 'Profile' },
+  { href: '/settings',  icon: 'settings',        label: 'Settings' },
 ];
 
 function getInitials(name = '') {
@@ -14,16 +16,18 @@ function getInitials(name = '') {
 }
 
 export default function Sidebar() {
-  const { user, role, logout } = useAuth();
+  const { user, role, logout, token } = useAuth();
   const router = useRouter();
 
   return (
     <aside className="sidebar">
       {/* Logo */}
       <div className="sidebar-logo">
-        <div className="sidebar-logo-text">
-          Team Task Manager
-        </div>
+        <Link href="/dashboard" style={{ textDecoration: 'none' }}>
+          <div className="sidebar-logo-text">
+            Team Task Manager
+          </div>
+        </Link>
       </div>
 
       {/* Nav */}
@@ -35,7 +39,7 @@ export default function Sidebar() {
             href={item.href}
             className={`nav-link${router.pathname.startsWith(item.href) ? ' active' : ''}`}
           >
-            <span style={{ fontSize: 16 }}>{item.icon}</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{item.icon}</span>
             {item.label}
           </Link>
         ))}
@@ -51,11 +55,11 @@ export default function Sidebar() {
               <div className="user-role">{role}</div>
             </div>
             <button className="logout-btn" title="Logout" onClick={logout}>
-              ⏻
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span>
             </button>
           </div>
         ) : (
-          <Link href="/auth/login" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+          <Link href="/auth/login" className="sidebar-signin-btn">
             Sign in
           </Link>
         )}
