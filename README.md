@@ -1,5 +1,4 @@
-# Team Task Manager (Frontend)
-
+# Team Task Manager 
 A Next.js frontend for a team task and project management application. It provides authenticated screens for dashboard, projects, tasks, teams, and account management, and integrates with a REST API backend.
 
 ## Links
