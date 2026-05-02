@@ -1,175 +1,223 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getDashboard } from '../lib/api';
+import { getDashboard, getTasks } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
-function StatCard({ icon, iconClass, value, label }) {
-  return (
-    <div className="stat-card">
-      <div className={`stat-icon ${iconClass}`}>{icon}</div>
-      <div>
-        <div className="stat-val">{value ?? '—'}</div>
-        <div className="stat-label">{label}</div>
-      </div>
-    </div>
-  );
-}
-
-function statusBadge(s) {
-  const map = { todo: 'badge-todo', 'in-progress': 'badge-inprogress', review: 'badge-review', completed: 'badge-completed' };
-  return <span className={`badge ${map[s] || 'badge-todo'}`}>{s}</span>;
-}
-
-function priorityBadge(p) {
-  const map = { low: 'badge-low', medium: 'badge-medium', high: 'badge-high', urgent: 'badge-urgent' };
-  return <span className={`badge ${map[p] || 'badge-medium'}`}>{p}</span>;
-}
-
 export default function Dashboard() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [data, setData] = useState(null);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!token) { setLoading(false); return; }
     let mounted = true;
-    getDashboard(token)
-      .then(res => { if (mounted) setData(res?.dashboard || null); })
-      .catch(e => { if (mounted) setError(e.message); })
+    Promise.all([
+      getDashboard(token),
+      getTasks(token, { assignedTo: 'me', limit: 6 }),
+    ])
+      .then(([dashRes, taskRes]) => {
+        if (mounted) {
+          setData(dashRes?.dashboard || null);
+          const rawTasks = taskRes?.tasks;
+          setTasks(Array.isArray(rawTasks) ? rawTasks : []);
+        }
+      })
+      .catch(err => { if (mounted) setError(err.message || 'Unable to load'); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, [token]);
 
   const ov = data?.overview || {};
-  const byStatus = data?.tasksByStatus || {};
-  const recent = data?.recentTasks || [];
-  const upcoming = data?.upcomingDeadlines || [];
+  const completedPct = ov.totalTasks ? Math.round((ov.completedTasks / ov.totalTasks) * 100) : 0;
 
-  const completedPct = ov.totalTasks
-    ? Math.round((ov.completedTasks / ov.totalTasks) * 100)
-    : 0;
+  const firstName = user?.name?.split(' ')[0] || 'there';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  const weekBars = [
+    { day: 'MON', h: 50 },
+    { day: 'TUE', h: 65 },
+    { day: 'WED', h: 75 },
+    { day: 'THU', h: 35 },
+    { day: 'FRI', h: 85, highlight: true },
+    { day: 'SAT', h: 100 },
+    { day: 'SUN', h: 80 },
+  ];
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
+      <div className="spinner" style={{ width: 32, height: 32 }} />
+    </div>
+  );
 
   return (
-    <>
-      <div className="page-header">
+    <main style={{ padding: '0 48px 48px', maxWidth: 1280 }}>
+      {/* Hero greeting */}
+      <section style={{ marginBottom: 48, display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'flex-end', gap: 32, paddingTop: 16 }}>
         <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">Overview of your team&apos;s progress and tasks</p>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 8, letterSpacing: '-0.02em' }}>
+            {greeting}, {firstName}.
+          </h2>
+          <p className="font-body-base" style={{ color: 'var(--text-muted)', maxWidth: 500 }}>
+            You have <strong style={{ color: 'var(--text)' }}>{ov.myAssignedTasks || tasks.length}</strong> priority tasks today and <strong style={{ color: 'var(--text)' }}>{ov.activeProjects || 0}</strong> active projects.
+          </p>
         </div>
-        <Link href="/projects" className="btn btn-primary">
-          + New Project
-        </Link>
-      </div>
+      </section>
 
-      <div className="page-body">
-        {!token && (
-          <div className="alert alert-error">
-            Please <Link href="/auth/login" style={{ color: '#fff', textDecoration: 'underline' }}>sign in</Link> to view your dashboard.
-          </div>
-        )}
-        {error && <div className="alert alert-error">{error}</div>}
+      {error && <div className="alert alert-error">{error}</div>}
 
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px' }}>
-            <div className="spinner" style={{ margin: '0 auto' }} />
+      {/* Main grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32 }}>
+        {/* Left: Today's Tasks */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem' }}>Today&apos;s Tasks</h3>
+            <Link href="/tasks" className="text-label-caps" style={{ color: 'var(--text-muted)', letterSpacing: '0.1em' }}>VIEW ALL</Link>
           </div>
-        ) : (
-          <>
-            {/* Stats */}
-            <div className="grid-stats" style={{ marginBottom: 28 }}>
-              <StatCard icon="📁" iconClass="indigo"  value={ov.totalProjects}    label="Total Projects" />
-              <StatCard icon="🚀" iconClass="violet"  value={ov.activeProjects}   label="Active Projects" />
-              <StatCard icon="✅" iconClass="green"   value={ov.completedTasks}   label="Completed Tasks" />
-              <StatCard icon="📋" iconClass="sky"     value={ov.totalTasks}       label="Total Tasks" />
-              <StatCard icon="⏰" iconClass="red"     value={ov.overdueTasks}     label="Overdue" />
-              <StatCard icon="🎯" iconClass="amber"   value={ov.myAssignedTasks}  label="Assigned to Me" />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {tasks.length > 0 ? tasks.slice(0, 5).map((t, i) => (
+              <div
+                key={t._id || i}
+                className="card"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '14px 18px',
+                  opacity: t.status === 'completed' ? 0.55 : 1,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: '50%',
+                    border: t.status === 'completed' ? 'none' : '1.5px solid var(--border-strong)',
+                    background: t.status === 'completed' ? 'var(--accent)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    {t.status === 'completed' && (
+                      <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#fff' }}>check</span>
+                    )}
+                  </div>
+                  <div>
+                    <h4 style={{
+                      fontSize: 14, fontWeight: 500, color: 'var(--text)',
+                      textDecoration: t.status === 'completed' ? 'line-through' : 'none',
+                    }}>
+                      {t.title}
+                    </h4>
+                    <p style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 2 }}>
+                      {t.project?.name || (t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '')}
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {t.priority && (
+                    <span className={`badge badge-${t.priority}`}>
+                      {t.priority}
+                    </span>
+                  )}
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--text-subtle)' }}>drag_indicator</span>
+                </div>
+              </div>
+            )) : (
+              <div className="empty-state" style={{ padding: '32px 16px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 40, opacity: 0.3, display: 'block', marginBottom: 8 }}>task_alt</span>
+                <div className="empty-title">No tasks assigned</div>
+                <p>Create tasks from the Tasks page to get started.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Productivity Overview */}
+        <div>
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <h3 className="text-label-caps" style={{ color: 'var(--accent-light)', letterSpacing: '0.12em' }}>PRODUCTIVITY OVERVIEW</h3>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--text-subtle)', cursor: 'pointer' }}>more_horiz</span>
             </div>
 
-            {/* Progress + status */}
-            <div className="grid-cols-2" style={{ marginBottom: 28 }}>
-              <div className="card">
-                <div style={{ marginBottom: 14, fontWeight: 700 }}>Overall Completion</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <div className="progress-bar" style={{ flex: 1 }}>
-                    <div className="progress-fill" style={{ width: `${completedPct}%` }} />
-                  </div>
-                  <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{completedPct}%</span>
-                </div>
-                <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  {ov.completedTasks || 0} of {ov.totalTasks || 0} tasks completed
-                </p>
-              </div>
-
-              <div className="card">
-                <div style={{ marginBottom: 14, fontWeight: 700 }}>Tasks by Status</div>
-                {['todo', 'in-progress', 'review', 'completed'].map(s => (
-                  <div key={s} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    {statusBadge(s)}
-                    <span style={{ fontWeight: 600 }}>{byStatus[s] || 0}</span>
-                  </div>
-                ))}
-              </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 24 }}>
+              <span style={{ fontSize: '2.5rem', fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>
+                {completedPct || 0}%
+              </span>
+              <span className="text-label-caps" style={{ color: 'var(--accent)' }}>
+                completed
+              </span>
             </div>
 
-            {/* Recent tasks */}
-            {recent.length > 0 && (
-              <div className="card" style={{ marginBottom: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700 }}>Recent Tasks</div>
-                  <Link href="/tasks" className="btn btn-ghost btn-sm">View all →</Link>
-                </div>
-                <div className="table-wrap">
-                  <table>
-                    <thead><tr><th>Task</th><th>Status</th><th>Priority</th><th>Due</th></tr></thead>
-                    <tbody>
-                      {recent.slice(0, 5).map(t => (
-                        <tr key={t._id}>
-                          <td style={{ fontWeight: 500 }}>{t.title}</td>
-                          <td>{statusBadge(t.status)}</td>
-                          <td>{priorityBadge(t.priority)}</td>
-                          <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                            {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {/* Bar chart */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 6, height: 120, marginBottom: 12 }}>
+              {weekBars.map((bar) => (
+                <div
+                  key={bar.day}
+                  style={{
+                    flex: 1,
+                    height: `${bar.h}%`,
+                    borderRadius: '3px 3px 0 0',
+                    background: bar.highlight
+                      ? 'var(--accent)'
+                      : `rgba(138,154,142,${0.15 + (bar.h / 300)})`,
+                    transition: 'height 0.4s ease',
+                  }}
+                />
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              {weekBars.map(bar => (
+                <span key={bar.day} style={{
+                  flex: 1, textAlign: 'center',
+                  fontSize: 9, fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  color: bar.highlight ? 'var(--accent)' : 'var(--text-subtle)',
+                  textTransform: 'uppercase',
+                }}>
+                  {bar.day}
+                </span>
+              ))}
+            </div>
+          </div>
 
-            {/* Upcoming deadlines */}
-            {upcoming.length > 0 && (
-              <div className="card">
-                <div style={{ fontWeight: 700, marginBottom: 16 }}>Upcoming Deadlines</div>
-                {upcoming.slice(0, 5).map(t => (
-                  <div key={t._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{t.title}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t.project?.name || 'No project'}</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {priorityBadge(t.priority)}
-                      <span style={{ fontSize: 12, color: 'var(--warning)' }}>
-                        {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '—'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+          {/* Stats summary cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {[
+              { label: 'Total Tasks', value: ov.totalTasks || 0, icon: 'assignment', color: 'var(--text)' },
+              { label: 'Completed', value: ov.completedTasks || 0, icon: 'check_circle', color: 'var(--success)' },
+              { label: 'Overdue', value: ov.overdueTasks || 0, icon: 'warning', color: 'var(--danger)' },
+              { label: 'Projects', value: ov.totalProjects || 0, icon: 'folder_open', color: 'var(--text)' },
+            ].map(stat => (
+              <div key={stat.label} className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-subtle)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{stat.label}</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--text-subtle)' }}>{stat.icon}</span>
+                </div>
+                <div style={{ fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 700, color: stat.color }}>{stat.value}</div>
               </div>
-            )}
-
-            {!data && !loading && token && (
-              <div className="empty-state">
-                <div className="empty-icon">📊</div>
-                <div className="empty-title">No data yet</div>
-                <p>Create some projects and tasks to see your dashboard stats.</p>
-              </div>
-            )}
-          </>
-        )}
+            ))}
+          </div>
+        </div>
       </div>
-    </>
+
+      {/* Upcoming Deadlines */}
+      {Array.isArray(data?.upcomingDeadlines) && data.upcomingDeadlines.length > 0 && (
+        <section style={{ marginTop: 48 }}>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: 16 }}>Upcoming Deadlines</h3>
+          <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }} className="no-scrollbar">
+            {data.upcomingDeadlines.map(t => (
+              <div key={t._id} className="card" style={{ minWidth: 280, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--warning)', fontWeight: 700, marginBottom: 6 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>schedule</span>
+                  {t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                </div>
+                <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{t.title}</h4>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t.project?.name || ''}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </main>
   );
 }

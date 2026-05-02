@@ -1,98 +1,61 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-  getProject,
-  updateProject,
-  deleteProject,
-  getTasks,
-  createTask,
-  updateTaskStatus,
-  addProjectMember,
-  removeProjectMember,
-  getUsers,
-} from '../../lib/api';
+import { getProject, deleteProject, getTasks, createTask, updateProject, addProjectMember, removeProjectMember } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 
 const STATUSES = ['todo', 'in-progress', 'review', 'completed'];
+const PROJECT_STATUSES = ['active', 'completed', 'on-hold', 'archived'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
-
-const STATUS_LABELS = { todo: '📋 Todo', 'in-progress': '🔄 In Progress', review: '👁 Review', completed: '✅ Done' };
-
-function statusBadge(s) {
-  const map = { todo: 'badge-todo', 'in-progress': 'badge-inprogress', review: 'badge-review', completed: 'badge-completed' };
-  return <span className={`badge ${map[s] || 'badge-todo'}`}>{s}</span>;
-}
-function priorityBadge(p) {
-  const map = { low: 'badge-low', medium: 'badge-medium', high: 'badge-high', urgent: 'badge-urgent' };
-  return <span className={`badge ${map[p] || 'badge-medium'}`}>{p}</span>;
-}
+const STATUS_LABELS = { todo: 'To Do', 'in-progress': 'In Progress', review: 'Review', completed: 'Done' };
+const STATUS_ICONS = { todo: 'radio_button_unchecked', 'in-progress': 'autorenew', review: 'visibility', completed: 'check_circle' };
 
 function TaskCard({ task, token, onStatusChange }) {
-  const [updating, setUpdating] = useState(false);
-
-  async function cycleStatus() {
-    const idx = STATUSES.indexOf(task.status);
-    const next = STATUSES[(idx + 1) % STATUSES.length];
-    setUpdating(true);
-    try {
-      const res = await updateTaskStatus(token, task._id, next);
-      onStatusChange(res.task);
-    } catch (e) { alert(e.message); }
-    finally { setUpdating(false); }
-  }
-
   return (
-    <div className="task-card">
-      <div className="task-card-title">{task.title}</div>
+    <div className="card" style={{ padding: 16, marginBottom: 10, cursor: 'pointer' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span className={`badge badge-${task.status === 'in-progress' ? 'inprogress' : task.status}`}>{task.status}</span>
+        {(task.priority === 'high' || task.priority === 'urgent') && (
+          <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--danger)' }}>priority_high</span>
+        )}
+      </div>
+      <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>{task.title}</h4>
       {task.description && (
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-          {task.description.slice(0, 80)}{task.description.length > 80 ? '…' : ''}
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+          {task.description.slice(0, 80)}{task.description.length > 80 ? '...' : ''}
         </p>
       )}
-      <div className="task-card-meta">
-        {priorityBadge(task.priority)}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
         {task.dueDate && (
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-            📅 {new Date(task.dueDate).toLocaleDateString()}
+          <span style={{ fontSize: 11, color: 'var(--text-subtle)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>schedule</span>
+            {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </span>
         )}
         {task.assignedTo && (
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-            👤 {task.assignedTo.name || task.assignedTo.email}
-          </span>
+          <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff' }}>
+            {(task.assignedTo.name || task.assignedTo.email || '?').charAt(0).toUpperCase()}
+          </div>
         )}
       </div>
-      <button
-        className="btn btn-ghost btn-sm"
-        style={{ marginTop: 8, fontSize: 11, padding: '3px 8px' }}
-        onClick={cycleStatus}
-        disabled={updating}
-      >
-        {updating ? '…' : '⟳ Advance'}
-      </button>
     </div>
   );
 }
 
 function AddTaskModal({ token, projectId, members, onClose, onCreated }) {
-  const [title, setTitle]         = useState('');
-  const [desc, setDesc]           = useState('');
-  const [priority, setPriority]   = useState('medium');
+  const [title, setTitle] = useState('');
+  const [desc, setDesc] = useState('');
+  const [priority, setPriority] = useState('medium');
   const [assignedTo, setAssignedTo] = useState('');
-  const [dueDate, setDueDate]     = useState('');
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      const res = await createTask(token, {
-        title, description: desc, projectId,
-        priority, dueDate: dueDate || undefined,
-        assignedTo: assignedTo || undefined,
-      });
+      const res = await createTask(token, { title, description: desc, projectId, priority, dueDate: dueDate || undefined, assignedTo: assignedTo || undefined });
       onCreated(res.task);
       onClose();
     } catch (err) { setError(err.message); }
@@ -104,7 +67,7 @@ function AddTaskModal({ token, projectId, members, onClose, onCreated }) {
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title">Add Task</div>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={onClose}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span></button>
         </div>
         {error && <div className="alert alert-error">{error}</div>}
         <form onSubmit={handleSubmit}>
@@ -133,9 +96,7 @@ function AddTaskModal({ token, projectId, members, onClose, onCreated }) {
             <select id="task-assign" className="form-select" value={assignedTo} onChange={e => setAssignedTo(e.target.value)}>
               <option value="">Unassigned</option>
               {members.map(m => (
-                <option key={m.user?._id || m._id} value={m.user?._id || m._id}>
-                  {m.user?.name || m.user?.email || m.name || m.email}
-                </option>
+                <option key={m.user?._id || m._id} value={m.user?._id || m._id}>{m.user?.name || m.user?.email || m.name || m.email}</option>
               ))}
             </select>
           </div>
@@ -151,191 +112,302 @@ function AddTaskModal({ token, projectId, members, onClose, onCreated }) {
   );
 }
 
+function EditProjectModal({ token, project, onClose, onSaved }) {
+  const [name, setName] = useState(project?.name || '');
+  const [description, setDescription] = useState(project?.description || '');
+  const [status, setStatus] = useState(project?.status || 'active');
+  const [deadline, setDeadline] = useState(project?.deadline ? project.deadline.slice(0, 10) : '');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      const res = await updateProject(token, project._id, {
+        name,
+        description,
+        status,
+        deadline: deadline || undefined,
+      });
+      onSaved(res.project || res);
+      onClose();
+    } catch (err) { setError(err.message || 'Unable to update project'); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">Edit Project</div>
+          <button className="modal-close" onClick={onClose}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span></button>
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">Project name *</label>
+            <input className="form-input" value={name} onChange={e => setName(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Description</label>
+            <textarea className="form-textarea" value={description} onChange={e => setDescription(e.target.value)} />
+          </div>
+          <div className="grid-cols-2">
+            <div className="form-group">
+              <label className="form-label">Status</label>
+              <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
+                {PROJECT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Deadline</label>
+              <input type="date" className="form-input" value={deadline} onChange={e => setDeadline(e.target.value)} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" disabled={loading}>{loading ? 'Saving…' : 'Save changes'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AddMemberModal({ token, projectId, onClose, onAdded }) {
+  const [userId, setUserId] = useState('');
+  const [role, setRole] = useState('member');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      await addProjectMember(token, projectId, userId, role);
+      onAdded();
+      onClose();
+    } catch (err) { setError(err.message || 'Unable to add member'); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">Add Member</div>
+          <button className="modal-close" onClick={onClose}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span></button>
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">User ID *</label>
+            <input className="form-input" placeholder="Paste user ID" value={userId} onChange={e => setUserId(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Role</label>
+            <select className="form-select" value={role} onChange={e => setRole(e.target.value)}>
+              <option value="member">member</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" disabled={loading}>{loading ? 'Adding…' : 'Add member'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectPage() {
   const router = useRouter();
   const { id } = router.query;
-  const { token, role } = useAuth();
-
+  const { token, role, user } = useAuth();
   const [project, setProject] = useState(null);
-  const [tasks, setTasks]     = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState('');
+  const [error, setError] = useState('');
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [tab, setTab] = useState('kanban'); // kanban | list
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showMemberModal, setShowMemberModal] = useState(false);
 
   function loadAll() {
     if (!id || !token) return;
     setLoading(true);
-    Promise.all([
-      getProject(token, id),
-      getTasks(token, { projectId: id }),
-    ])
-      .then(([projRes, taskRes]) => {
-        setProject(projRes?.project || projRes);
-        setTasks(taskRes?.tasks || []);
-      })
+    Promise.all([getProject(token, id), getTasks(token, { projectId: id })])
+      .then(([projRes, taskRes]) => { setProject(projRes?.project || projRes); setTasks(taskRes?.tasks || []); })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }
 
   useEffect(() => { loadAll(); }, [id, token]); // eslint-disable-line
 
-  function handleTaskStatusChange(updatedTask) {
-    setTasks(prev => prev.map(t => t._id === updatedTask._id ? updatedTask : t));
-  }
-
-  function handleTaskCreated(task) {
-    setTasks(prev => [task, ...prev]);
-  }
+  function handleTaskStatusChange(updatedTask) { setTasks(prev => prev.map(t => t._id === updatedTask._id ? updatedTask : t)); }
+  function handleTaskCreated(task) { setTasks(prev => [task, ...prev]); }
 
   async function handleDeleteProject() {
     if (!confirm(`Delete project "${project?.name}"? This will also delete all its tasks.`)) return;
+    try { await deleteProject(token, id); router.push('/projects'); }
+    catch (e) { alert(e.message); }
+  }
+
+  async function handleRemoveMember(userId, name) {
+    if (!confirm(`Remove ${name || 'this member'} from the project?`)) return;
     try {
-      await deleteProject(token, id);
-      router.push('/projects');
+      await removeProjectMember(token, id, userId);
+      loadAll();
     } catch (e) { alert(e.message); }
   }
 
-  const tasksByStatus = STATUSES.reduce((acc, s) => {
-    acc[s] = tasks.filter(t => t.status === s);
-    return acc;
-  }, {});
+  const tasksByStatus = STATUSES.reduce((acc, s) => { acc[s] = tasks.filter(t => t.status === s); return acc; }, {});
+  const ownerId = project?.owner?._id;
+  const myMember = project?.members?.find(m => (m.user?._id || m._id) === user?._id);
+  const isProjectAdmin = role === 'admin' || ownerId === user?._id || myMember?.role === 'admin';
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-      <div className="spinner" style={{ width: 36, height: 36 }} />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
+      <div className="spinner" style={{ width: 32, height: 32 }} />
     </div>
   );
 
   return (
     <>
-      <div className="page-header">
-        <div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>
-            <Link href="/projects" style={{ color: 'var(--accent)' }}>Projects</Link> / {project?.name}
+      <main style={{ padding: '0 48px 48px', maxWidth: 1280 }}>
+        <section style={{ paddingTop: 16, marginBottom: 32 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Link href="/projects" style={{ color: 'var(--accent)' }}>Projects</Link>
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>chevron_right</span>
+            {project?.name}
           </div>
-          <h1 className="page-title">{project?.name || 'Project'}</h1>
-          {project?.description && (
-            <p className="page-subtitle">{project.description}</p>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-primary" onClick={() => setShowTaskModal(true)}>+ Add Task</button>
-          {role === 'admin' && (
-            <button className="btn btn-danger" onClick={handleDeleteProject}>🗑 Delete</button>
-          )}
-        </div>
-      </div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 8 }}>
+            {project?.name || 'Project'}
+          </h2>
+          {project?.description && <p style={{ fontSize: 14, color: 'var(--text-muted)', maxWidth: 600 }}>{project.description}</p>}
+        </section>
 
-      <div className="page-body">
         {error && <div className="alert alert-error">{error}</div>}
 
         {/* Project meta */}
         {project && (
           <div className="card" style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span className={`badge badge-${project.status === 'on-hold' ? 'onhold' : project.status}`}>
-                {project.status}
+              <span className={`badge badge-${project.status === 'on-hold' ? 'onhold' : project.status}`}>{project.status}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>person</span>
+                Owner: <strong style={{ color: 'var(--text)' }}>{project.owner?.name || project.owner?.email || 'Unknown'}</strong>
               </span>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                👤 Owner: <strong style={{ color: 'var(--text)' }}>{project.owner?.name || project.owner?.email || 'Unknown'}</strong>
-              </span>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                👥 {project.members?.length || 0} members
+              <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>group</span>
+                {project.members?.length || 0} members
               </span>
               {project.deadline && (
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  📅 Deadline: <strong style={{ color: 'var(--warning)' }}>{new Date(project.deadline).toLocaleDateString()}</strong>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>calendar_today</span>
+                  Deadline: <strong style={{ color: 'var(--warning)' }}>{new Date(project.deadline).toLocaleDateString()}</strong>
                 </span>
               )}
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                📋 {tasks.length} tasks
+              <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>assignment</span>
+                {tasks.length} tasks
               </span>
+              {isProjectAdmin && (
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowEditModal(true)}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                  Edit
+                </button>
+              )}
             </div>
           </div>
         )}
 
-        {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
-          {[['kanban', '🗂 Kanban'], ['list', '📋 List']].map(([v, label]) => (
-            <button
-              key={v}
-              className={`btn ${tab === v ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-              onClick={() => setTab(v)}
-            >
-              {label}
-            </button>
+        {project && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Members</h3>
+              {isProjectAdmin && (
+                <button className="btn btn-primary btn-sm" onClick={() => setShowMemberModal(true)}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person_add</span>
+                  Add member
+                </button>
+              )}
+            </div>
+            {(project.members || []).length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No members yet.</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                {project.members.map(m => {
+                  const u = m.user || m;
+                  const isOwner = u?._id && u._id === ownerId;
+                  return (
+                    <div key={u?._id || `${u?.email}-${m?.role}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{u?.name || u?.email || 'User'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m?.role}{isOwner ? ' • owner' : ''}</div>
+                      </div>
+                      {isProjectAdmin && !isOwner && (
+                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleRemoveMember(u._id, u.name || u.email)}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Kanban board */}
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${STATUSES.length}, 1fr)`, gap: 20, alignItems: 'start' }}>
+          {STATUSES.map(s => (
+            <div key={s}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--text-muted)' }}>{STATUS_ICONS[s]}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{STATUS_LABELS[s]}</span>
+                  <span style={{ minWidth: 20, height: 20, borderRadius: 6, background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', padding: '0 4px' }}>
+                    {tasksByStatus[s].length}
+                  </span>
+                </div>
+                <button onClick={() => setShowTaskModal(true)} style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-subtle)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {tasksByStatus[s].length === 0 ? (
+                  <p style={{ fontSize: 12, color: 'var(--text-subtle)', textAlign: 'center', padding: '24px 0' }}>No tasks</p>
+                ) : tasksByStatus[s].map(t => (
+                  <TaskCard key={t._id} task={t} token={token} onStatusChange={handleTaskStatusChange} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
-        {/* Kanban view */}
-        {tab === 'kanban' && (
-          <div className="kanban-board">
-            {STATUSES.map(s => (
-              <div key={s} className="kanban-col">
-                <div className="kanban-col-header">
-                  <div className="kanban-col-title">
-                    {STATUS_LABELS[s]}
-                    <span className="kanban-count">{tasksByStatus[s].length}</span>
-                  </div>
-                </div>
-                {tasksByStatus[s].length === 0 ? (
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>Empty</p>
-                ) : (
-                  tasksByStatus[s].map(t => (
-                    <TaskCard key={t._id} task={t} token={token} onStatusChange={handleTaskStatusChange} />
-                  ))
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* List view */}
-        {tab === 'list' && (
-          tasks.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">✅</div>
-              <div className="empty-title">No tasks yet</div>
-              <p>Click &quot;Add Task&quot; to create the first task.</p>
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Task</th><th>Status</th><th>Priority</th><th>Assigned</th><th>Due</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tasks.map(t => (
-                    <tr key={t._id}>
-                      <td style={{ fontWeight: 500 }}>{t.title}</td>
-                      <td>{statusBadge(t.status)}</td>
-                      <td>{priorityBadge(t.priority)}</td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                        {t.assignedTo?.name || t.assignedTo?.email || '—'}
-                      </td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                        {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
-        )}
-      </div>
+        {/* Actions bar */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 32, justifyContent: 'flex-end' }}>
+          <button className="btn btn-primary" onClick={() => setShowTaskModal(true)}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span> Add Task
+          </button>
+          {ownerId === user?._id && (
+            <button className="btn btn-danger" onClick={handleDeleteProject}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span> Delete
+            </button>
+          )}
+        </div>
+      </main>
 
       {showTaskModal && (
-        <AddTaskModal
-          token={token}
-          projectId={id}
-          members={project?.members || []}
-          onClose={() => setShowTaskModal(false)}
-          onCreated={handleTaskCreated}
-        />
+        <AddTaskModal token={token} projectId={id} members={project?.members || []} onClose={() => setShowTaskModal(false)} onCreated={handleTaskCreated} />
+      )}
+      {showEditModal && project && (
+        <EditProjectModal token={token} project={project} onClose={() => setShowEditModal(false)} onSaved={updated => setProject(updated)} />
+      )}
+      {showMemberModal && project && (
+        <AddMemberModal token={token} projectId={id} onClose={() => setShowMemberModal(false)} onAdded={loadAll} />
       )}
     </>
   );
