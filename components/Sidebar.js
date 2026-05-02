@@ -3,10 +3,10 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 
 const NAV = [
-  { href: '/dashboard', icon: '📊', label: 'Dashboard' },
-  { href: '/projects',  icon: '📁', label: 'Projects'  },
-  { href: '/tasks',     icon: '✅', label: 'Tasks'     },
-  { href: '/teams',     icon: '👥', label: 'Teams'     },
+  { href: '/dashboard', icon: '', label: 'Dashboard' },
+  { href: '/projects',  icon: '', label: 'Projects'  },
+  { href: '/tasks',     icon: '', label: 'Tasks'     },
+  { href: '/teams',     icon: '', label: 'Teams'     },
 ];
 
 function getInitials(name = '') {
@@ -21,10 +21,8 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* Logo */}
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">⚡</div>
         <div className="sidebar-logo-text">
-          TaskFlow
-          <span>Team Task Manager</span>
+          Team Task Manager
         </div>
       </div>
 
