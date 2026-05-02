@@ -36,15 +36,6 @@ export default function Dashboard() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const weekBars = [
-    { day: 'MON', h: 50 },
-    { day: 'TUE', h: 65 },
-    { day: 'WED', h: 75 },
-    { day: 'THU', h: 35 },
-    { day: 'FRI', h: 85, highlight: true },
-    { day: 'SAT', h: 100 },
-    { day: 'SUN', h: 80 },
-  ];
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
@@ -133,53 +124,6 @@ export default function Dashboard() {
 
         {/* Right: Productivity Overview */}
         <div>
-          <div className="card" style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-              <h3 className="text-label-caps" style={{ color: 'var(--accent-light)', letterSpacing: '0.12em' }}>PRODUCTIVITY OVERVIEW</h3>
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--text-subtle)', cursor: 'pointer' }}>more_horiz</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 24 }}>
-              <span style={{ fontSize: '2.5rem', fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>
-                {completedPct || 0}%
-              </span>
-              <span className="text-label-caps" style={{ color: 'var(--accent)' }}>
-                completed
-              </span>
-            </div>
-
-            {/* Bar chart */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 6, height: 120, marginBottom: 12 }}>
-              {weekBars.map((bar) => (
-                <div
-                  key={bar.day}
-                  style={{
-                    flex: 1,
-                    height: `${bar.h}%`,
-                    borderRadius: '3px 3px 0 0',
-                    background: bar.highlight
-                      ? 'var(--accent)'
-                      : `rgba(138,154,142,${0.15 + (bar.h / 300)})`,
-                    transition: 'height 0.4s ease',
-                  }}
-                />
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              {weekBars.map(bar => (
-                <span key={bar.day} style={{
-                  flex: 1, textAlign: 'center',
-                  fontSize: 9, fontWeight: 700,
-                  letterSpacing: '0.06em',
-                  color: bar.highlight ? 'var(--accent)' : 'var(--text-subtle)',
-                  textTransform: 'uppercase',
-                }}>
-                  {bar.day}
-                </span>
-              ))}
-            </div>
-          </div>
-
           {/* Stats summary cards */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[

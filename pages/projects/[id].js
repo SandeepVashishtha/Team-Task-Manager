@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getProject, deleteProject, getTasks, createTask, updateProject, addProjectMember, removeProjectMember } from '../../lib/api';
+import { getProject, deleteProject, getTasks, createTask, updateProject, addProjectMember, removeProjectMember, getUsers } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 
 const STATUSES = ['todo', 'in-progress', 'review', 'completed'];
@@ -178,8 +178,30 @@ function EditProjectModal({ token, project, onClose, onSaved }) {
 function AddMemberModal({ token, projectId, onClose, onAdded }) {
   const [userId, setUserId] = useState('');
   const [role, setRole] = useState('member');
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    if (!token) { setUsersLoading(false); return; }
+    setUsersLoading(true);
+    setUsersError('');
+    getUsers(token, { limit: 200 })
+      .then(res => {
+        if (!mounted) return;
+        setUsers(res?.users || []);
+      })
+      .catch(err => {
+        if (!mounted) return;
+        setUsersError(err.message || 'Unable to load users');
+        setUsers([]);
+      })
+      .finally(() => { if (mounted) setUsersLoading(false); });
+    return () => { mounted = false; };
+  }, [token]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -202,8 +224,29 @@ function AddMemberModal({ token, projectId, onClose, onAdded }) {
         {error && <div className="alert alert-error">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">User ID *</label>
-            <input className="form-input" placeholder="Paste user ID" value={userId} onChange={e => setUserId(e.target.value)} required />
+            <label className="form-label">User *</label>
+            {users.length > 0 ? (
+              <select className="form-select" value={userId} onChange={e => setUserId(e.target.value)} required>
+                <option value="">Select a user</option>
+                {users.map(u => (
+                  <option key={u._id} value={u._id}>
+                    {u.name || u.email} {u.email ? `(${u.email})` : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input className="form-input" placeholder="Paste user ID" value={userId} onChange={e => setUserId(e.target.value)} required />
+            )}
+            {usersLoading && (
+              <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 6 }}>
+                Loading users...
+              </div>
+            )}
+            {usersError && (
+              <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>
+                {usersError}. You can paste a user ID instead.
+              </div>
+            )}
           </div>
           <div className="form-group">
             <label className="form-label">Role</label>
